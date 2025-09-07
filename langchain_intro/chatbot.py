@@ -1,19 +1,30 @@
 # langchain_intro/chatbot.py
 
 import dotenv
-from langchain_openai import ChatOpenAI
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_chroma import Chroma
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
 from langchain.prompts import (
     PromptTemplate,
     SystemMessagePromptTemplate,
     HumanMessagePromptTemplate,
     ChatPromptTemplate,
 )
-from langchain_core.output_parsers import StrOutputParser
 
-# Load .env environment variables
+# Load environment variables
 dotenv.load_dotenv()
 
-# Step 1: Define the prompt templates
+# Paths
+REVIEWS_CHROMA_PATH = "chroma_data/"
+
+reviews_vector_db = Chroma(
+    persist_directory=REVIEWS_CHROMA_PATH,
+    embedding_function=OpenAIEmbeddings(),
+)
+reviews_retriever = reviews_vector_db.as_retriever(search_kwargs={"k": 10})
+
+# Prompt templates
 review_system_prompt = SystemMessagePromptTemplate(
     prompt=PromptTemplate(
         input_variables=["context"],
@@ -39,17 +50,22 @@ review_prompt_template = ChatPromptTemplate.from_messages(
     [review_system_prompt, review_human_prompt]
 )
 
-# Step 2: Set up chain
+# Chain setup
 chat_model = ChatOpenAI(model="gpt-4o", temperature=0)
 output_parser = StrOutputParser()
-review_chain = review_prompt_template | chat_model | output_parser
 
-# Step 3: Function to test chatbot
-def test_chatbot(context: str, question: str) -> str:
-    return review_chain.invoke({"context": context, "question": question})
+review_chain = (
+    {"context": reviews_retriever, "question": RunnablePassthrough()}
+    | review_prompt_template
+    | chat_model
+    | output_parser
+)
 
-# Step 4: Run test
+# Optional test function
+def test_chatbot(question: str) -> str:
+    return review_chain.invoke(question)
+
+# Run test
 if __name__ == "__main__":
-    sample_context = "The nurses were kind and attentive throughout my stay."
-    sample_question = "Were there any comments about the nursing staff?"
-    print(test_chatbot(sample_context, sample_question))
+    question = "Were there any complaints about communication with hospital staff?"
+    print(test_chatbot(question))

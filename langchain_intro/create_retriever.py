@@ -1,6 +1,6 @@
 import dotenv
-from langchain_community.vectorstores import Chroma
-from langchain_community.document_loaders.csv_loader import CSVLoader
+from langchain_community.document_loaders import CSVLoader
+from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
 
 REVIEWS_CSV_PATH = "data/reviews.csv"
@@ -14,5 +14,5 @@ reviews = loader.load()
 reviews_vector_db = Chroma.from_documents(
     documents=reviews,
     embedding=OpenAIEmbeddings(),
-    persist_directory=REVIEWS_CHROMA_PATH
+    persist_directory=REVIEWS_CHROMA_PATH,
 )
