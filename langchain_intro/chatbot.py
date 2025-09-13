@@ -1,6 +1,8 @@
 # langchain_intro/chatbot.py
 
 import dotenv
+import time
+import random
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_chroma import Chroma
 from langchain_core.output_parsers import StrOutputParser
@@ -11,11 +13,17 @@ from langchain.prompts import (
     HumanMessagePromptTemplate,
     ChatPromptTemplate,
 )
+from langchain.agents import Tool, create_openai_functions_agent, AgentExecutor
+from langchain import hub
+
+# Custom tool function
+from langchain_intro.tools import get_current_wait_time
 
 # Load environment variables
 dotenv.load_dotenv()
 
-# Paths
+# ─────────────────────────────────────────────────────────────
+# VECTORSTORE & RETRIEVER
 REVIEWS_CHROMA_PATH = "chroma_data/"
 
 reviews_vector_db = Chroma(
@@ -24,7 +32,8 @@ reviews_vector_db = Chroma(
 )
 reviews_retriever = reviews_vector_db.as_retriever(search_kwargs={"k": 10})
 
-# Prompt templates
+# ─────────────────────────────────────────────────────────────
+# REVIEW PROMPT SETUP
 review_system_prompt = SystemMessagePromptTemplate(
     prompt=PromptTemplate(
         input_variables=["context"],
@@ -50,7 +59,8 @@ review_prompt_template = ChatPromptTemplate.from_messages(
     [review_system_prompt, review_human_prompt]
 )
 
-# Chain setup
+# ─────────────────────────────────────────────────────────────
+# REVIEW CHAIN
 chat_model = ChatOpenAI(model="gpt-4o", temperature=0)
 output_parser = StrOutputParser()
 
@@ -61,11 +71,67 @@ review_chain = (
     | output_parser
 )
 
-# Optional test function
-def test_chatbot(question: str) -> str:
+# ─────────────────────────────────────────────────────────────
+# AGENT TOOL SETUP
+tools = [
+    Tool(
+        name="Reviews",
+        func=review_chain.invoke,
+        description="""Useful when you need to answer questions
+        about patient reviews or experiences at the hospital.
+        Not useful for answering questions about visit details like billing, treatment, or wait times.
+        Pass the entire question as input. Example: "What do patients say about the nurses?"
+        """
+    ),
+    Tool(
+        name="Waits",
+        func=get_current_wait_time,
+        description="""Use when asked about current wait times at a specific hospital.
+        Returns wait time in minutes. Input must only be the hospital name (e.g., "B", not "Hospital B").
+        Example: "What is the wait time at hospital C?" → input should be "C"
+        """
+    ),
+]
+
+# ─────────────────────────────────────────────────────────────
+# AGENT SETUP
+agent_chat_model = ChatOpenAI(model="gpt-4o", temperature=0)
+
+hospital_agent_prompt = hub.pull("hwchase17/openai-functions-agent")
+
+hospital_agent = create_openai_functions_agent(
+    llm=agent_chat_model,
+    prompt=hospital_agent_prompt,
+    tools=tools,
+)
+
+hospital_agent_executor = AgentExecutor(
+    agent=hospital_agent,
+    tools=tools,
+    return_intermediate_steps=True,
+    verbose=True,
+)
+
+# ─────────────────────────────────────────────────────────────
+# TEST FUNCTIONS
+
+def test_chatbot_review_chain(question: str) -> str:
+    """Test review_chain independently."""
     return review_chain.invoke(question)
 
-# Run test
+def test_agent(question: str) -> dict:
+    """Test agent decision-making."""
+    return hospital_agent_executor.invoke({"input": question})
+
+# ─────────────────────────────────────────────────────────────
+# MAIN
+
 if __name__ == "__main__":
-    question = "Were there any complaints about communication with hospital staff?"
-    print(test_chatbot(question))
+    # test 1: review chain
+    print(test_chatbot_review_chain(
+        "Were there any complaints about communication with hospital staff?"
+    ))
+
+    # test 2: agent routing
+    print(test_agent("What is the wait time at hospital B?"))
+    print(test_agent("What do patients say about cleanliness?"))
