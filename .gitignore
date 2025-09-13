@@ -1,0 +1,109 @@
+.env
+# ------------------------------
+# Python
+# ------------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# ------------------------------
+# Virtual environments
+# ------------------------------
+.venv/
+venv/
+ENV/
+env/
+*.env
+.env.*
+
+# ------------------------------
+# Jupyter / IPython
+# ------------------------------
+.ipynb_checkpoints/
+
+# ------------------------------
+# VS Code and IDEs
+# ------------------------------
+.vscode/
+.idea/
+
+# ------------------------------
+# Logs and temp
+# ------------------------------
+*.log
+*.tmp
+*.bak
+*.swp
+
+# ------------------------------
+# OS files
+# ------------------------------
+.DS_Store
+Thumbs.db
+
+# ------------------------------
+# Environment and credentials
+# ------------------------------
+.env
+.env.local
+*.secret
+*.key
+*.pem
+*.crt
+
+# ------------------------------
+# LangChain / ChromaDB related
+# ------------------------------
+chroma_data/
+index_data/
+*.db
+*.sqlite
+
+# ------------------------------
+# LangChain LLM Cache
+# ------------------------------
+.lc_cache/
+
+# ------------------------------
+# Git / GitHub related
+# ------------------------------
+*.orig
+*.rej
+*.patch
+*.gz
+
+# ------------------------------
+# Large file tracking (optional)
+# ------------------------------
+*.bin
+*.h5
+*.pt
+*.ckpt
+*.pkl
+*.npy
+*.npz
+
+# ------------------------------
+# Mac-specific
+# ------------------------------
+.AppleDouble
+.LSOverride
+Icon?
+
+# ------------------------------
+# Windows-specific
+# ------------------------------
+ehthumbs.db
+Desktop.ini
+
+# ------------------------------
+# Others (if any LLM cache tools)
+# ------------------------------
+cache/
+

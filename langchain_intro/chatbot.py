@@ -1,19 +1,39 @@
 # langchain_intro/chatbot.py
 
 import dotenv
-from langchain_openai import ChatOpenAI
+import time
+import random
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_chroma import Chroma
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
 from langchain.prompts import (
     PromptTemplate,
     SystemMessagePromptTemplate,
     HumanMessagePromptTemplate,
     ChatPromptTemplate,
 )
-from langchain_core.output_parsers import StrOutputParser
+from langchain.agents import Tool, create_openai_functions_agent, AgentExecutor
+from langchain import hub
 
-# Load .env environment variables
+# Custom tool function
+from langchain_intro.tools import get_current_wait_time
+
+# Load environment variables
 dotenv.load_dotenv()
 
-# Step 1: Define the prompt templates
+# ─────────────────────────────────────────────────────────────
+# VECTORSTORE & RETRIEVER
+REVIEWS_CHROMA_PATH = "chroma_data/"
+
+reviews_vector_db = Chroma(
+    persist_directory=REVIEWS_CHROMA_PATH,
+    embedding_function=OpenAIEmbeddings(),
+)
+reviews_retriever = reviews_vector_db.as_retriever(search_kwargs={"k": 10})
+
+# ─────────────────────────────────────────────────────────────
+# REVIEW PROMPT SETUP
 review_system_prompt = SystemMessagePromptTemplate(
     prompt=PromptTemplate(
         input_variables=["context"],
@@ -39,17 +59,79 @@ review_prompt_template = ChatPromptTemplate.from_messages(
     [review_system_prompt, review_human_prompt]
 )
 
-# Step 2: Set up chain
+# ─────────────────────────────────────────────────────────────
+# REVIEW CHAIN
 chat_model = ChatOpenAI(model="gpt-4o", temperature=0)
 output_parser = StrOutputParser()
-review_chain = review_prompt_template | chat_model | output_parser
 
-# Step 3: Function to test chatbot
-def test_chatbot(context: str, question: str) -> str:
-    return review_chain.invoke({"context": context, "question": question})
+review_chain = (
+    {"context": reviews_retriever, "question": RunnablePassthrough()}
+    | review_prompt_template
+    | chat_model
+    | output_parser
+)
 
-# Step 4: Run test
+# ─────────────────────────────────────────────────────────────
+# AGENT TOOL SETUP
+tools = [
+    Tool(
+        name="Reviews",
+        func=review_chain.invoke,
+        description="""Useful when you need to answer questions
+        about patient reviews or experiences at the hospital.
+        Not useful for answering questions about visit details like billing, treatment, or wait times.
+        Pass the entire question as input. Example: "What do patients say about the nurses?"
+        """
+    ),
+    Tool(
+        name="Waits",
+        func=get_current_wait_time,
+        description="""Use when asked about current wait times at a specific hospital.
+        Returns wait time in minutes. Input must only be the hospital name (e.g., "B", not "Hospital B").
+        Example: "What is the wait time at hospital C?" → input should be "C"
+        """
+    ),
+]
+
+# ─────────────────────────────────────────────────────────────
+# AGENT SETUP
+agent_chat_model = ChatOpenAI(model="gpt-4o", temperature=0)
+
+hospital_agent_prompt = hub.pull("hwchase17/openai-functions-agent")
+
+hospital_agent = create_openai_functions_agent(
+    llm=agent_chat_model,
+    prompt=hospital_agent_prompt,
+    tools=tools,
+)
+
+hospital_agent_executor = AgentExecutor(
+    agent=hospital_agent,
+    tools=tools,
+    return_intermediate_steps=True,
+    verbose=True,
+)
+
+# ─────────────────────────────────────────────────────────────
+# TEST FUNCTIONS
+
+def test_chatbot_review_chain(question: str) -> str:
+    """Test review_chain independently."""
+    return review_chain.invoke(question)
+
+def test_agent(question: str) -> dict:
+    """Test agent decision-making."""
+    return hospital_agent_executor.invoke({"input": question})
+
+# ─────────────────────────────────────────────────────────────
+# MAIN
+
 if __name__ == "__main__":
-    sample_context = "The nurses were kind and attentive throughout my stay."
-    sample_question = "Were there any comments about the nursing staff?"
-    print(test_chatbot(sample_context, sample_question))
+    # test 1: review chain
+    print(test_chatbot_review_chain(
+        "Were there any complaints about communication with hospital staff?"
+    ))
+
+    # test 2: agent routing
+    print(test_agent("What is the wait time at hospital B?"))
+    print(test_agent("What do patients say about cleanliness?"))
