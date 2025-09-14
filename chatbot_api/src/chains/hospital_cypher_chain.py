@@ -150,6 +150,7 @@ hospital_cypher_chain = GraphCypherQAChain.from_llm(
     qa_llm=ChatOpenAI(model=HOSPITAL_QA_MODEL, temperature=0),
     graph=graph,
     verbose=True,
+    allow_dangerous_requests=True,
     qa_prompt=qa_generation_prompt,
     cypher_prompt=cypher_generation_prompt,
     validate_cypher=True,
