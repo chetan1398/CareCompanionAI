@@ -7,7 +7,7 @@ from langchain.prompts import (
     PromptTemplate,
     SystemMessagePromptTemplate,
 )
-from langchain.vectorstores.neo4j_vector import Neo4jVector
+from langchain_community.vectorstores import Neo4jVector
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 
 HOSPITAL_QA_MODEL = os.getenv("HOSPITAL_QA_MODEL")

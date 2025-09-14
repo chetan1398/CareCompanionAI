@@ -1,3 +1,5 @@
+version: '3.9'
+
 services:
   hospital_neo4j_etl:
     container_name: carecompanionai-hospital_neo4j_etl
@@ -6,3 +8,66 @@ services:
     env_file:
       - .env
     restart: on-failure
+
+  chatbot_api:
+    container_name: carecompanionai-chatbot_api
+    build:
+      context: ./chatbot_api
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app              # ensures imports work
+      - PYTHONUNBUFFERED=1           # logs show up immediately
+    depends_on:
+      - hospital_neo4j_etl
+    ports:
+      - "8000:8000"
+
+  chatbot_frontend:
+    container_name: carecompanionai-chatbot_frontend
+    build:
+      context: ./chatbot_frontend
+    env_file:
+      - .env
+    depends_on:
+      - chatbot_api
+    ports:
+      - "8501:8501"
+
+
+
+
+
+
+# version: '3'
+
+# services:
+#   hospital_neo4j_etl:
+#     container_name: carecompanionai-hospital_neo4j_etl
+#     build:
+#       context: ./hospital_neo4j_etl
+#     env_file:
+#       - .env
+#     restart: on-failure
+
+#   chatbot_api:
+#     container_name: carecompanionai-chatbot_api
+#     build:
+#       context: ./chatbot_api
+#     env_file:
+#       - .env
+#     depends_on:
+#       - hospital_neo4j_etl
+#     ports:
+#       - "8000:8000"
+    
+
+#   chatbot_frontend:
+#     build:
+#       context: ./chatbot_frontend
+#     env_file:
+#       - .env
+#     depends_on:
+#       - chatbot_api
+#     ports:
+#       - "8501:8501"
